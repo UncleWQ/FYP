@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 import matplotlib.pyplot as plt
 
+
 class NPYDataset(Dataset):
     def __init__(self, root):
         self.root = root
@@ -51,27 +52,24 @@ def train(model, device, train_loader, optimizer, epoch, train_losses, train_cou
         optimizer.step()
         if batch_idx % 10 == 0:
             train_losses.append(loss.item())
-            train_counter.append((batch_idx * 64) + ((epoch - 1) * len(train_loader.dataset)))
+            train_counter.append((batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
             print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
 def test(model, device, test_loader, test_losses, test_accuracy):
     model.eval()
     test_loss = 0
     correct = 0
-    total_samples = 0
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            loss = F.cross_entropy(output, target, reduction='sum').item()
-            test_loss += loss
-            total_samples += data.size(0)
+            test_loss += F.cross_entropy(output, target, reduction='sum').item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
-    average_loss = test_loss / total_samples
-    test_losses.append(average_loss)
-    test_accuracy.append(100. * correct / total_samples)
-    print(f'\nTest set: Average loss: {average_loss:.4f}, Accuracy: {correct}/{total_samples} ({100. * correct / total_samples:.0f}%)\n')
+    test_loss /= len(test_loader.dataset)
+    test_losses.append(test_loss)
+    test_accuracy.append(100. * correct / len(test_loader.dataset))
+    print(f'\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({100. * correct / len(test_loader.dataset):.0f}%)\n')
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -82,10 +80,8 @@ def main():
 
     train_dataset = NPYDataset('12_DTweighted/train')
     test_dataset = NPYDataset('12_DTweighted/test')
-    train_loader = DataLoader(train_dataset, batch_size=100, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
-
-    print("Data loaded!")
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     train_losses, train_counter = [], []
     test_losses, test_accuracy = [], []
@@ -95,19 +91,16 @@ def main():
         test(model, device, test_loader, test_losses, test_accuracy)
 
     # 绘制loss和accuracy曲线
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 2, 1)
-    plt.plot(train_counter, train_losses, label="Train Loss")
-    plt.title('Training Loss Over Time')
-    plt.xlabel('Number of training examples seen')
-    plt.ylabel('Loss')
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    ax1.plot(train_counter, train_losses, color='blue')
+    ax1.set_xlabel('Number of training examples seen')
+    ax1.set_ylabel('Training loss')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(test_accuracy, label="Test Accuracy")
-    plt.title('Test Accuracy Over Time')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy (%)')
-    plt.legend()
+    ax2.plot(test_accuracy, color='red')
+    ax2.set_xlabel('Epochs')
+    ax2.set_ylabel('Test accuracy (%)')
+
+    plt.tight_layout()
     plt.show()
     plt.savefig("Classifier.jpg")
 if __name__ == '__main__':
