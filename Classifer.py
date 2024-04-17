@@ -1,27 +1,42 @@
+###Data load by wenren
 import os
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import time
 
+# 自定义数据集类
 class NPYDataset(Dataset):
     def __init__(self, root):
-        self.root = root
-        self.file_paths = [os.path.join(root, fname) for fname in os.listdir(root)]
+        self.data, self.labels = self.load_data(root)
     
+    def load_data(self, root):
+        path_list = [path for path in os.listdir(root)]
+        data = []
+        label = []
+        for data_path in path_list:
+            data_org = np.load(os.path.join(root, data_path))
+            if data_path[1] == '3':  # 1: hard fall 2: soft fall 3: non-fall
+                lb = 0
+            else:
+                lb = 1
+            data.append(data_org)
+            label.append(lb)
+        return np.array(data), np.array(label)
+
     def __len__(self):
-        return len(self.file_paths)
+        return len(self.data)
     
     def __getitem__(self, idx):
-        file_path = self.file_paths[idx]
-        data = np.load(file_path)
-        label = 0 if file_path.split('/')[-1][1] == '3' else 1
-        data = torch.from_numpy(data).float().unsqueeze(0)  # 添加通道维度
-        return data, label
+        data_tensor = torch.from_numpy(self.data[idx]).float().unsqueeze(0)  # 添加通道维度
+        label_tensor = torch.tensor(self.labels[idx], dtype=torch.long)
+        return data_tensor, label_tensor
 
+# CNN模型定义
 class LKCNN(nn.Module):
     def __init__(self):
         super(LKCNN, self).__init__()
@@ -40,6 +55,7 @@ class LKCNN(nn.Module):
         x = self.fc2(x)
         return x
 
+# 训练函数
 def train(model, device, train_loader, optimizer, epoch, train_losses, train_counter):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -54,61 +70,62 @@ def train(model, device, train_loader, optimizer, epoch, train_losses, train_cou
             train_counter.append((batch_idx * 64) + ((epoch - 1) * len(train_loader.dataset)))
             print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
 
+# 测试函数
 def test(model, device, test_loader, test_losses, test_accuracy):
     model.eval()
     test_loss = 0
     correct = 0
-    total_samples = 0
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            loss = F.cross_entropy(output, target, reduction='sum').item()
-            test_loss += loss
-            total_samples += data.size(0)
+            test_loss += F.cross_entropy(output, target, reduction='sum').item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
-    average_loss = test_loss / total_samples
-    test_losses.append(average_loss)
-    test_accuracy.append(100. * correct / total_samples)
-    print(f'\nTest set: Average loss: {average_loss:.4f}, Accuracy: {correct}/{total_samples} ({100. * correct / total_samples:.0f}%)\n')
+    test_loss /= len(test_loader.dataset)
+    test_losses.append(test_loss)
+    test_accuracy.append(100. * correct / len(test_loader.dataset))
+    print(f'\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({100. * correct / len(test_loader.dataset):.0f}%)\n')
 
+# 主程序
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = LKCNN().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    # name = torch.cuda.get_device_name()
-    # print('Using device '+ name + ' to train the model.')
+    optimizer = optim.Adam(model.parameters(), lr=0.0005)
+    name = torch.cuda.get_device_name()
+    print('Using device '+ name + ' to train the model.')
 
-    train_dataset = NPYDataset('12_DTweighted/train')
-    test_dataset = NPYDataset('12_DTweighted/test')
-    train_loader = DataLoader(train_dataset, batch_size=100, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
-
+    train_dataset = NPYDataset('/tmp/FYP_Projects/Diffusion')
+    test_dataset = NPYDataset('/tmp/FYP_Projects/12_DTweighted/test')
+    train_loader = DataLoader(train_dataset, batch_size=200, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=200, shuffle=False)
     print("Data loaded!")
 
     train_losses, train_counter = [], []
     test_losses, test_accuracy = [], []
 
-    for epoch in range(1, 11):  # 进行10个epochs的训练
+    begin = time.time()
+    for epoch in range(1, 51):  # 进行10个epochs的训练
         train(model, device, train_loader, optimizer, epoch, train_losses, train_counter)
         test(model, device, test_loader, test_losses, test_accuracy)
 
     # 绘制loss和accuracy曲线
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(12, 6))
     plt.subplot(1, 2, 1)
-    plt.plot(train_counter, train_losses, label="Train Loss")
-    plt.title('Training Loss Over Time')
+    plt.plot(train_counter, train_losses, color='blue')
     plt.xlabel('Number of training examples seen')
-    plt.ylabel('Loss')
+    plt.ylabel('Training loss')
 
     plt.subplot(1, 2, 2)
-    plt.plot(test_accuracy, label="Test Accuracy")
-    plt.title('Test Accuracy Over Time')
+    plt.plot(test_accuracy, color='red')
     plt.xlabel('Epochs')
-    plt.ylabel('Accuracy (%)')
-    plt.legend()
+    plt.ylabel('Test accuracy (%)')
+
+    plt.tight_layout()
     plt.show()
     plt.savefig("Classifier.jpg")
+    elapsed = (time.time() - begin) / 60
+    print(f'Task finished! cost_time={elapsed:.3f} min')
+
 if __name__ == '__main__':
     main()

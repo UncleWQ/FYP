@@ -140,23 +140,24 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 criterion = nn.MSELoss()
 
 # 加载数据并训练
-dataset = NPYDataset('/kaggle/input/fyp-dataset/12_DTweighted/train', betas, device)
+dataset = NPYDataset('/tmp/FYP_Projects/12_DTweighted/train', betas, device)
 dataloader = DataLoader(dataset, batch_size=200, shuffle=True)
 print("Data loaded!")
 train_losses = train(model, dataloader, 10, optimizer, criterion, device)
-torch.save(model.state_dict(),'/kaggle/working/diffusion_model_new.pt')
+torch.save(model.state_dict(),'/tmp/FYP_Projects/diffusion_model.pt')
 print("Model saved!")
+
 # 可视化损失
 plt.plot(train_losses)
 plt.title('Training Loss over Epochs')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.show()
-plt.savefig("/kaggle/working/Diffusion_loss.jpg")
+plt.savefig("Diffusion_loss.jpg")
 
 # 逆扩散过程
 print("Begin to generate!")
 start_time = time.time()
-reverse_diffusion(model, dataloader, '/kaggle/working/Diffusion', betas, device)
-gen_time = (time.time()-start_time) / 60
-print(f'Task finished! cost_time={gen_time:.3f} min')
+reverse_diffusion(model, dataloader, '/tmp/FYP_Projects/Diffusion', betas, device)
+elapsed = (time.time()-start_time) / 60
+print(f'Task finished! cost_time={elapsed:.3f} min')
