@@ -143,7 +143,7 @@ criterion = nn.MSELoss()
 dataset = NPYDataset('/tmp/FYP_Projects/12_DTweighted/train', betas, device)
 dataloader = DataLoader(dataset, batch_size=200, shuffle=True)
 print("Data loaded!")
-train_losses = train(model, dataloader, 10, optimizer, criterion, device)
+train_losses = train(model, dataloader, 200, optimizer, criterion, device)
 torch.save(model.state_dict(),'/tmp/FYP_Projects/diffusion_model.pt')
 print("Model saved!")
 
