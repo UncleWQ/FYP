@@ -8,6 +8,14 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import time
 from sklearn.metrics import recall_score, precision_score
+import matplotlib
+
+matplotlib.rcParams.update({
+    'font.size': 16, 
+    'figure.dpi': 150,
+    'axes.labelweight': 'bold',  # 加粗坐标轴标签
+    'axes.titleweight': 'bold'   # 加粗标题
+})
 
 class NPYDataset(Dataset):
     def __init__(self, root):
@@ -131,30 +139,26 @@ def main():
     print(f'Average Test Precision over {len(test_precision)} epochs: {average_test_precision:.3f}%')
 
     plt.figure(figsize=(24, 20))
-    plt.subplot(2, 2, 1)
-    plt.plot(range(1, len(epoch_losses)+1), epoch_losses, color='blue')
-    plt.xlabel('Epochs')
-    plt.ylabel('Average Training Loss')
 
-    plt.subplot(2, 2, 2)
-    plt.plot(range(1, len(test_accuracy)+1), test_accuracy, color='red')
-    plt.xlabel('Epochs')
-    plt.ylabel('Test Accuracy (%)')
+    # 为每个子图配置增加颜色和加粗线条
+    colors = ['blue', 'red', 'green', 'purple']
+    titles = ['Average Test Loss', 'Test Accuracy (%)', 'Test Recall (%)', 'Test Precision (%)']
+    data_lists = [epoch_losses, test_accuracy, test_recall, test_precision]
+    labels = ['Epochs', 'Epochs', 'Epochs', 'Epochs']
+    y_labels = ['Loss', 'Accuracy (%)', 'Recall (%)', 'Precision (%)']
 
-    plt.subplot(2, 2, 3)
-    plt.plot(range(1, len(test_recall)+1), test_recall, color='green')
-    plt.xlabel('Epochs')
-    plt.ylabel('Test Recall (%)')
-
-    plt.subplot(2, 2, 4)
-    plt.plot(range(1, len(test_precision)+1), test_precision, color='purple')
-    plt.xlabel('Epochs')
-    plt.ylabel('Test Precision (%)')
+    for i in range(4):
+        plt.subplot(2, 2, i + 1)
+        plt.plot(range(1, len(data_lists[i]) + 1), data_lists[i], color=colors[i], linewidth=3)
+        plt.title(titles[i])
+        plt.xlabel(labels[i])
+        plt.ylabel(y_labels[i])
+        # 移除网格
+        plt.grid(False)
 
     plt.tight_layout()
     plt.show()
     plt.savefig("Classifier_performance_diffusion.jpg")
-
 
     elapsed = (time.time() - begin) / 60
     print(f'Task finished! Total time={elapsed:.3f} min')
